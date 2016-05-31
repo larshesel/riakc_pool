@@ -5,9 +5,9 @@
 -author('Martynas Pumputis <martynasp@gmail.com>').
 
 %% API
--export([start/0, stop/0, exec/2, exec/3]).
+-export([start/0, stop/0, exec/3, exec/4]).
 
--include("riakcp.hrl").
+-include_lib("riakc_pool/include/riakcp.hrl").
 
 -define(TIMEOUT, 5000). % Default poolboy worker timeout
 
@@ -21,14 +21,14 @@
 %% `riakc_pb_socket:put(Pid, <<"a">>, <<"b">>)`.
 %%
 %% NOTE: The Timeout is for poolboy worker, but not for riak client!
--spec exec(atom(), list()) -> term().
-exec(FunctionName, Args) ->
-    exec(FunctionName, Args, get_timeout()).
+-spec exec(atom(), atom(), list()) -> term().
+exec(PoolName, FunctionName, Args) ->
+    exec(PoolName, FunctionName, Args, get_timeout()).
 
--spec exec(atom(), list(), pos_integer()) -> term().
-exec(FunctionName, Args, Timeout) ->
+-spec exec(atom(), atom(), list(), pos_integer()) -> term().
+exec(PoolName, FunctionName, Args, Timeout) ->
     poolboy:transaction(
-        ?POOL_NAME,
+        PoolName,
         fun (Worker) ->
             erlang:apply(riakc_pb_socket, FunctionName, [Worker|Args])
         end,

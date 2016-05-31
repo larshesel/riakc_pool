@@ -3,7 +3,7 @@
 
 -behaviour(supervisor).
 
--include("riakcp.hrl").
+-include_lib("riakc_pool/include/riakcp.hrl").
 
 %% API
 -export([start_link/0]).
@@ -23,27 +23,27 @@ start_link() ->
 %%%============================================================================
 
 init([]) ->
-    PoolSize = get_env(pool_size, ?POOL_SIZE),
-    PoolMaxOverflow = get_env(pool_max_overflow, ?POOL_MAX_OVERFLOW),
-    PoolArgs = [{name, {local, ?POOL_NAME}},
+    PoolSpecs = get_pool_child_specs(application:get_env(?APP, pools, [])),
+    {ok, {{one_for_one, 1, 10}, PoolSpecs}}.
+
+get_pool_child_specs(AppEnv) ->
+    [get_pool_child_spec(Pool) || Pool <- AppEnv].
+
+get_pool_child_spec({PoolName, Opts}) ->
+    PoolSize = proplists:get_value(pool_size, Opts, ?POOL_SIZE),
+    PoolMaxOverflow = proplists:get_value(pool_max_overflow, Opts, ?POOL_MAX_OVERFLOW),
+    PoolArgs = [{name, {local, PoolName}},
                 {worker_module, riakcp_worker},
                 {size, PoolSize}, {max_overflow, PoolMaxOverflow}],
 
-    RiakAddr = get_env(riak_address, ?RIAK_ADDR),
-    RiakPort = get_env(riak_port, ?RIAK_PORT),
-    RiakOpts = get_env(riak_options, []),
+    RiakAddr = proplists:get_value(riak_address, Opts, ?RIAK_ADDR),
+    RiakPort = proplists:get_value(riak_port, Opts, ?RIAK_PORT),
+    RiakOpts = proplists:get_value(riak_options, Opts, []),
     RiakArgs = {RiakAddr, RiakPort, RiakOpts},
 
-    PoolSpec = poolboy:child_spec(?POOL_NAME, PoolArgs, RiakArgs),
+    poolboy:child_spec(PoolName, PoolArgs, RiakArgs).
 
-    {ok, {{one_for_one, 1, 10}, [PoolSpec]}}.
 
 %%%============================================================================
 %%% Internal functions
 %%%============================================================================
-
-get_env(Key, Default) ->
-    case application:get_env(?APP, Key) of
-        {ok, Val} -> Val;
-        undefined -> Default
-    end.
